@@ -1,0 +1,44 @@
+{
+  "name": "fitclub",
+  "version": "1.0.0",
+  "private": true,
+  "description": "FITCLUB — fitness club platform: public website, member portal and administration in one monorepo.",
+  "license": "UNLICENSED",
+  "packageManager": "npm@11.13.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "db:local:init": "node scripts/dev-db.mjs init",
+    "db:local:start": "node scripts/dev-db.mjs start",
+    "db:local:stop": "node scripts/dev-db.mjs stop",
+    "db:generate": "npm run db:generate -w @fitclub/api",
+    "db:migrate": "npm run db:migrate -w @fitclub/api",
+    "db:deploy": "npm run db:deploy -w @fitclub/api",
+    "db:seed": "npm run db:seed -w @fitclub/api",
+    "db:reset": "npm run db:reset -w @fitclub/api",
+    "provision:owner": "npm run provision:owner -w @fitclub/api --",
+    "build:shared": "npm run build -w @fitclub/shared",
+    "dev": "npm run build:shared && concurrently -k -n shared,api,web -c gray,cyan,magenta \"npm run dev -w @fitclub/shared\" \"npm run dev -w @fitclub/api\" \"npm run dev -w @fitclub/web\"",
+    "build": "npm run build -w @fitclub/shared && npm run build -w @fitclub/api && npm run build -w @fitclub/web",
+    "start": "concurrently -k -n api,web -c cyan,magenta \"npm run start -w @fitclub/api\" \"npm run start -w @fitclub/web\"",
+    "typecheck": "npm run build:shared && npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run build:shared && npm run test -w @fitclub/shared && npm run test -w @fitclub/api",
+    "test:e2e": "node scripts/e2e.mjs",
+    "test:e2e:install": "playwright install chromium",
+    "db:seed:reset": "npm run db:seed:reset -w @fitclub/api"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "concurrently": "10.0.6",
+    "prettier": "3.6.2",
+    "typescript": "5.9.3"
+  }
+}

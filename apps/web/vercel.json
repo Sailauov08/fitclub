@@ -1,0 +1,5 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm --prefix ../.. run build:shared && next build",
+  "regions": ["fra1"]
+}

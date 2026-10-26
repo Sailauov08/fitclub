@@ -1,0 +1,32 @@
+node_modules/
+dist/
+.next/
+.next-e2e/
+out/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# env & secrets
+.env
+.env.*
+!.env.example
+
+# generated
+apps/api/src/generated/
+apps/api/uploads/*
+!apps/api/uploads/.gitkeep
+
+# test artifacts
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.log

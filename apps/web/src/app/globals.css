@@ -1,0 +1,266 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * FITCLUB design tokens.
+ * Brand: warm ink + bone neutrals with a single "ember" accent. Display type is wide and
+ * confident (Unbounded), text is Inter. Corners stay tight; hierarchy comes from scale,
+ * spacing and rules rather than decoration.
+ */
+:root {
+  --ink: #0e0f0d;
+  --bone: #f3efe7;
+  --ember: #e8562a;
+  --ember-strong: #c9441c;
+
+  --background: #faf8f4;
+  --foreground: #16171a;
+  --surface: #ffffff;
+  --surface-2: #f3f0ea;
+  --muted: #6b6a66;
+  --border: #e4dfd6;
+  --border-strong: #cfc8bc;
+  --primary: var(--ember);
+  --primary-foreground: #ffffff;
+  --ring: #e8562a66;
+  --success: #2f7d55;
+  --success-soft: #e3f1e9;
+  --warning: #a66a00;
+  --warning-soft: #fbf0d9;
+  --danger: #c23434;
+  --danger-soft: #fbe5e3;
+  --info: #2c5d9c;
+  --info-soft: #e4ecf7;
+  --chart-1: #e8562a;
+  --chart-2: #2c5d9c;
+  --chart-3: #2f7d55;
+  --chart-4: #a66a00;
+  --chart-5: #7a5ca8;
+}
+
+.dark {
+  --background: #0f100e;
+  --foreground: #eeebe4;
+  --surface: #171815;
+  --surface-2: #1f201c;
+  --muted: #a19e96;
+  --border: #2b2c27;
+  --border-strong: #3a3b35;
+  --primary: #f0683d;
+  --primary-foreground: #0e0f0d;
+  --ring: #f0683d66;
+  --success: #5cc08a;
+  --success-soft: #16291f;
+  --warning: #e6ad45;
+  --warning-soft: #2d2412;
+  --danger: #ef6b6b;
+  --danger-soft: #331817;
+  --info: #79a8e6;
+  --info-soft: #152234;
+  --chart-1: #f0683d;
+  --chart-2: #79a8e6;
+  --chart-3: #5cc08a;
+  --chart-4: #e6ad45;
+  --chart-5: #b49be0;
+}
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-bone: var(--bone);
+  --color-ember: var(--ember);
+  --color-ember-strong: var(--ember-strong);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-unbounded), var(--font-inter), ui-sans-serif, sans-serif;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection {
+    background: var(--ember);
+    color: #fff;
+  }
+  :focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+}
+
+@layer components {
+  .container-page {
+    width: 100%;
+    max-width: 1320px;
+    margin-inline: auto;
+    padding-inline: 1rem;
+  }
+  @media (min-width: 640px) {
+    .container-page {
+      padding-inline: 1.5rem;
+    }
+  }
+  @media (min-width: 1024px) {
+    .container-page {
+      padding-inline: 2.5rem;
+    }
+  }
+  .eyebrow {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .display {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 0.98;
+  }
+  .prose-fit {
+    line-height: 1.7;
+  }
+  .prose-fit h2 {
+    font-family: var(--font-display);
+    font-size: 1.35rem;
+    font-weight: 600;
+    margin: 2rem 0 0.75rem;
+  }
+  .prose-fit h3 {
+    font-weight: 600;
+    font-size: 1.1rem;
+    margin: 1.5rem 0 0.5rem;
+  }
+  .prose-fit p {
+    margin: 0 0 1rem;
+  }
+  .prose-fit ul,
+  .prose-fit ol {
+    margin: 0 0 1rem 1.25rem;
+  }
+  .prose-fit ul {
+    list-style: disc;
+  }
+  .prose-fit ol {
+    list-style: decimal;
+  }
+  .prose-fit li {
+    margin: 0.25rem 0;
+  }
+  .prose-fit a {
+    color: var(--primary);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .prose-fit strong {
+    font-weight: 650;
+  }
+  .grain {
+    position: relative;
+  }
+  .grain::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.06;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.animate-marquee {
+  animation: marquee 40s linear infinite;
+}
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee {
+    animation: none;
+  }
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+    color: #000;
+  }
+}
+
+@media print {
+  body:has(#invoice-print) * {
+    visibility: hidden;
+  }
+  body:has(#invoice-print) #invoice-print,
+  body:has(#invoice-print) #invoice-print * {
+    visibility: visible;
+  }
+  #invoice-print {
+    position: fixed;
+    inset: 0;
+    padding: 2rem;
+    background: #fff;
+  }
+}

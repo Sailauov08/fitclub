@@ -1,0 +1,1270 @@
+// FITCLUB database schema (PostgreSQL).
+// Conventions: cuid ids, createdAt/updatedAt everywhere, localized text stored as JSON {kk,ru,en},
+// money as integer tenge (KZT has no minor unit in practice), timestamps in UTC.
+
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "cjs"
+  importFileExtension = ""
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ───────────────────────────── Identity & access ─────────────────────────────
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum StaffRole {
+  OWNER
+  ADMIN
+  MANAGER
+  RECEPTIONIST
+  TRAINER
+  SALES
+}
+
+enum AuthTokenType {
+  PASSWORD_RESET
+  EMAIL_VERIFY
+  STAFF_INVITE
+  MEMBER_INVITE
+}
+
+model User {
+  id               String     @id @default(cuid())
+  email            String     @unique
+  passwordHash     String?
+  status           UserStatus @default(ACTIVE)
+  emailVerifiedAt  DateTime?
+  locale           String     @default("ru")
+  failedLoginCount Int        @default(0)
+  lockedUntil      DateTime?
+  lastLoginAt      DateTime?
+  isDemo           Boolean    @default(false)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  deletedAt        DateTime?
+
+  profile       Profile?
+  staff         StaffMember?
+  member        Member?
+  trainer       Trainer?
+  sessions      Session[]
+  authTokens    AuthToken[]
+  notifications Notification[]
+  auditLogs     AuditLog[]       @relation("AuditActor")
+  assignedLeads Lead[]           @relation("LeadAssignee")
+  leadActivity  LeadActivity[]
+  memberNotes   MemberNote[]
+  mediaAssets   MediaAsset[]
+  blogPosts     BlogPost[]
+
+  @@index([status])
+}
+
+model Profile {
+  userId            String    @id
+  firstName         String
+  lastName          String
+  phone             String?
+  birthDate         DateTime? @db.Date
+  avatarUrl         String?
+  notificationPrefs Json
+  marketingOptIn    Boolean   @default(false)
+  termsAcceptedAt   DateTime?
+  updatedAt         DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([lastName, firstName])
+  @@index([phone])
+}
+
+model Session {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique
+  csrfHash   String
+  expiresAt  DateTime
+  lastUsedAt DateTime  @default(now())
+  revokedAt  DateTime?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model AuthToken {
+  id        String        @id @default(cuid())
+  type      AuthTokenType
+  tokenHash String        @unique
+  userId    String?
+  email     String
+  payload   Json?
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime      @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
+  @@index([email, type])
+}
+
+model StaffMember {
+  id        String     @id @default(cuid())
+  userId    String     @unique
+  role      StaffRole
+  /// null = all branches of the club
+  branchId  String?
+  title     String?
+  status    UserStatus @default(ACTIVE)
+  invitedById String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branch Branch? @relation(fields: [branchId], references: [id])
+
+  @@index([role])
+  @@index([branchId])
+}
+
+// ───────────────────────────── Club structure ─────────────────────────────
+
+model Club {
+  id        String   @id @default(cuid())
+  name      String
+  /// Validated by clubSettingsSchema in @fitclub/shared
+  settings  Json
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  branches Branch[]
+}
+
+model Branch {
+  id           String   @id @default(cuid())
+  clubId       String
+  slug         String   @unique
+  name         Json
+  city         Json
+  address      Json
+  description  Json
+  phone        String
+  email        String
+  latitude     Float?
+  longitude    Float?
+  timezone     String   @default("Asia/Almaty")
+  openingHours Json
+  imageUrl     String?
+  isActive     Boolean  @default(true)
+  sortOrder    Int      @default(100)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  club          Club            @relation(fields: [clubId], references: [id])
+  rooms         Room[]
+  staff         StaffMember[]
+  members       Member[]
+  trainers      Trainer[]
+  sessions      ClassSession[]
+  schedules     ClassSchedule[]
+  checkIns      CheckIn[]
+  leads         Lead[]
+  planBranches  PlanBranch[]
+  availability  TrainerAvailability[]
+  galleryItems  GalleryItem[]
+}
+
+model Room {
+  id        String   @id @default(cuid())
+  branchId  String
+  name      Json
+  capacity  Int
+  equipment Json
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  branch    Branch          @relation(fields: [branchId], references: [id])
+  sessions  ClassSession[]
+  schedules ClassSchedule[]
+
+  @@index([branchId])
+}
+
+// ───────────────────────────── Members & memberships ─────────────────────────────
+
+model Member {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  /// Human-friendly number printed on cards (FC-000123)
+  memberNumber      Int      @unique @default(autoincrement())
+  homeBranchId      String
+  assignedTrainerId String?
+  /// Bump to invalidate all previously issued QR codes
+  qrVersion         Int      @default(1)
+  isDemo            Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  homeBranch      Branch              @relation(fields: [homeBranchId], references: [id])
+  assignedTrainer Trainer?            @relation("AssignedTrainer", fields: [assignedTrainerId], references: [id])
+  memberships     Membership[]
+  bookings        Booking[]
+  waitlist        WaitlistEntry[]
+  checkIns        CheckIn[]
+  payments        Payment[]
+  invoices        Invoice[]
+  notes           MemberNote[]
+  assignments     ProgramAssignment[]
+  workoutLogs     WorkoutLog[]
+  redemptions     PromotionRedemption[]
+  convertedFrom   Lead[]
+
+  @@index([homeBranchId])
+  @@index([assignedTrainerId])
+  @@index([createdAt])
+}
+
+model MemberNote {
+  id        String   @id @default(cuid())
+  memberId  String
+  authorId  String
+  body      String
+  createdAt DateTime @default(now())
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  author User   @relation(fields: [authorId], references: [id])
+
+  @@index([memberId, createdAt])
+}
+
+enum PlanType {
+  MONTHLY
+  ANNUAL
+  CUSTOM
+  TRIAL
+  STUDENT
+  PROMO
+}
+
+enum PlanStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+model MembershipPlan {
+  id                String     @id @default(cuid())
+  code              String     @unique
+  type              PlanType
+  name              Json
+  description       Json
+  features          Json
+  price             Int
+  durationDays      Int
+  visitLimit        Int?
+  includesClasses   Boolean    @default(true)
+  allBranches       Boolean    @default(true)
+  freezeMaxDays     Int        @default(0)
+  freezeMaxTimes    Int        @default(0)
+  requiresStudentId Boolean    @default(false)
+  isPublic          Boolean    @default(true)
+  isFeatured        Boolean    @default(false)
+  sortOrder         Int        @default(100)
+  status            PlanStatus @default(ACTIVE)
+  /// Incremented on every edit; memberships keep the snapshot they were sold with
+  version           Int        @default(1)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  branches    PlanBranch[]
+  memberships Membership[]
+
+  @@index([status, isPublic, sortOrder])
+}
+
+model PlanBranch {
+  planId   String
+  branchId String
+
+  plan   MembershipPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  branch Branch         @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@id([planId, branchId])
+}
+
+enum MembershipStatus {
+  PENDING
+  ACTIVE
+  FROZEN
+  EXPIRED
+  CANCELLED
+}
+
+model Membership {
+  id              String           @id @default(cuid())
+  memberId        String
+  planId          String
+  status          MembershipStatus @default(PENDING)
+  startsAt        DateTime
+  endsAt          DateTime
+  /// Snapshot of the plan at sale time — later plan edits never rewrite history
+  planSnapshot    Json
+  planVersion     Int
+  price           Int
+  visitLimit      Int?
+  visitsUsed      Int              @default(0)
+  includesClasses Boolean
+  allBranches     Boolean
+  branchIds       String[]
+  freezeMaxDays   Int
+  freezeMaxTimes  Int
+  frozenDaysUsed  Int              @default(0)
+  freezeCount     Int              @default(0)
+  activatedAt     DateTime?
+  cancelledAt     DateTime?
+  cancelReason    String?
+  expiredAt       DateTime?
+  soldById        String?
+  isDemo          Boolean          @default(false)
+  /// Optimistic concurrency guard for state changes
+  version         Int              @default(1)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  member   Member             @relation(fields: [memberId], references: [id])
+  plan     MembershipPlan     @relation(fields: [planId], references: [id])
+  events   MembershipEvent[]
+  freezes  MembershipFreeze[]
+  payments Payment[]
+  bookings Booking[]
+  checkIns CheckIn[]
+
+  @@index([memberId, status])
+  @@index([status, endsAt])
+  @@index([activatedAt])
+}
+
+enum MembershipEventType {
+  CREATED
+  ACTIVATED
+  FROZEN
+  UNFROZEN
+  FREEZE_SCHEDULED
+  FREEZE_CANCELLED
+  EXTENDED
+  RENEWED
+  CANCELLED
+  EXPIRED
+  VISIT
+  NOTE
+}
+
+model MembershipEvent {
+  id           String              @id @default(cuid())
+  membershipId String
+  type         MembershipEventType
+  actorId      String?
+  data         Json?
+  createdAt    DateTime            @default(now())
+
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@index([membershipId, createdAt])
+  @@index([type, createdAt])
+}
+
+enum FreezeStatus {
+  SCHEDULED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+model MembershipFreeze {
+  id           String       @id @default(cuid())
+  membershipId String
+  /// Local calendar dates (Asia/Almaty) — freeze covers [startDate, endDate)
+  startDate    DateTime     @db.Date
+  endDate      DateTime     @db.Date
+  days         Int
+  daysUsed     Int?
+  status       FreezeStatus @default(SCHEDULED)
+  reason       String?
+  createdById  String?
+  endedAt      DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@index([membershipId])
+  @@index([status, startDate])
+  @@index([status, endDate])
+}
+
+// ───────────────────────────── Classes & bookings ─────────────────────────────
+
+enum Difficulty {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  ALL_LEVELS
+}
+
+enum SessionStatus {
+  SCHEDULED
+  CANCELLED
+  COMPLETED
+}
+
+model ClassCategory {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      Json
+  sortOrder Int      @default(100)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  classTypes ClassType[]
+}
+
+model ClassType {
+  id              String     @id @default(cuid())
+  slug            String     @unique
+  categoryId      String
+  name            Json
+  summary         Json
+  description     Json
+  difficulty      Difficulty
+  durationMinutes Int
+  defaultCapacity Int
+  intensity       Int        @default(3)
+  imageUrl        String?
+  isPublic        Boolean    @default(true)
+  isArchived      Boolean    @default(false)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  category  ClassCategory   @relation(fields: [categoryId], references: [id])
+  schedules ClassSchedule[]
+  sessions  ClassSession[]
+
+  @@index([categoryId])
+}
+
+/// Weekly recurring rule; sessions are materialised from it for the coming weeks.
+model ClassSchedule {
+  id              String    @id @default(cuid())
+  classTypeId     String
+  trainerId       String
+  roomId          String
+  branchId        String
+  weekday         Int
+  startMinute     Int
+  durationMinutes Int
+  capacity        Int
+  validFrom       DateTime  @db.Date
+  validUntil      DateTime? @db.Date
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  classType ClassType      @relation(fields: [classTypeId], references: [id])
+  trainer   Trainer        @relation(fields: [trainerId], references: [id])
+  room      Room           @relation(fields: [roomId], references: [id])
+  branch    Branch         @relation(fields: [branchId], references: [id])
+  sessions  ClassSession[]
+
+  @@index([branchId, weekday])
+  @@index([trainerId])
+}
+
+model ClassSession {
+  id           String        @id @default(cuid())
+  classTypeId  String
+  scheduleId   String?
+  trainerId    String
+  roomId       String
+  branchId     String
+  startsAt     DateTime
+  endsAt       DateTime
+  capacity     Int
+  /// Seats held by CONFIRMED/ATTENDED/NO_SHOW bookings; CHECK (0 <= bookedCount <= capacity)
+  bookedCount  Int           @default(0)
+  status       SessionStatus @default(SCHEDULED)
+  cancelReason String?
+  cancelledAt  DateTime?
+  reminderSentAt DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  classType ClassType       @relation(fields: [classTypeId], references: [id])
+  schedule  ClassSchedule?  @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  trainer   Trainer         @relation(fields: [trainerId], references: [id])
+  room      Room            @relation(fields: [roomId], references: [id])
+  branch    Branch          @relation(fields: [branchId], references: [id])
+  bookings  Booking[]
+  waitlist  WaitlistEntry[]
+
+  @@unique([scheduleId, startsAt])
+  @@index([branchId, startsAt])
+  @@index([trainerId, startsAt])
+  @@index([roomId, startsAt])
+  @@index([status, startsAt])
+}
+
+enum BookingStatus {
+  CONFIRMED
+  CANCELLED
+  LATE_CANCELLED
+  ATTENDED
+  NO_SHOW
+}
+
+/// One row per (session, member): re-booking after a cancellation reuses the row,
+/// so the unique constraint makes double booking impossible at the database level.
+model Booking {
+  id           String        @id @default(cuid())
+  sessionId    String
+  memberId     String
+  membershipId String?
+  status       BookingStatus @default(CONFIRMED)
+  bookedById   String?
+  fromWaitlist Boolean       @default(false)
+  cancelledAt  DateTime?
+  attendedAt   DateTime?
+  markedById   String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  session    ClassSession @relation(fields: [sessionId], references: [id])
+  member     Member       @relation(fields: [memberId], references: [id])
+  membership Membership?  @relation(fields: [membershipId], references: [id])
+
+  @@unique([sessionId, memberId])
+  @@index([memberId, status])
+  @@index([sessionId, status])
+}
+
+enum WaitlistStatus {
+  WAITING
+  PROMOTED
+  CANCELLED
+  EXPIRED
+}
+
+model WaitlistEntry {
+  id         String         @id @default(cuid())
+  sessionId  String
+  memberId   String
+  status     WaitlistStatus @default(WAITING)
+  promotedAt DateTime?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  session ClassSession @relation(fields: [sessionId], references: [id])
+  member  Member       @relation(fields: [memberId], references: [id])
+
+  @@unique([sessionId, memberId])
+  @@index([sessionId, status, createdAt])
+}
+
+enum CheckInMethod {
+  QR
+  SEARCH
+  MANUAL_OVERRIDE
+}
+
+enum CheckInStatus {
+  ACCEPTED
+  REJECTED
+}
+
+model CheckIn {
+  id             String        @id @default(cuid())
+  memberId       String
+  membershipId   String?
+  branchId       String
+  staffId        String
+  method         CheckInMethod
+  status         CheckInStatus
+  rejectReason   String?
+  overrideReason String?
+  /// Local calendar date (Asia/Almaty) — used for duplicate prevention and daily stats
+  localDate      DateTime      @db.Date
+  createdAt      DateTime      @default(now())
+
+  member     Member      @relation(fields: [memberId], references: [id])
+  membership Membership? @relation(fields: [membershipId], references: [id])
+  branch     Branch      @relation(fields: [branchId], references: [id])
+
+  @@index([branchId, localDate])
+  @@index([memberId, localDate])
+  @@index([createdAt])
+}
+
+// ───────────────────────────── Trainers & training ─────────────────────────────
+
+model Trainer {
+  id                     String   @id @default(cuid())
+  slug                   String   @unique
+  userId                 String?  @unique
+  branchId               String
+  displayName            String
+  headline               Json
+  bio                    Json
+  specializations        String[]
+  certifications         String[]
+  experienceYears        Int      @default(0)
+  photoUrl               String?
+  offersPersonalTraining Boolean  @default(true)
+  isPublic               Boolean  @default(true)
+  isActive               Boolean  @default(true)
+  sortOrder              Int      @default(100)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  user            User?                 @relation(fields: [userId], references: [id])
+  branch          Branch                @relation(fields: [branchId], references: [id])
+  availability    TrainerAvailability[]
+  schedules       ClassSchedule[]
+  sessions        ClassSession[]
+  assignedMembers Member[]              @relation("AssignedTrainer")
+  programs        TrainingProgram[]
+  assignments     ProgramAssignment[]
+
+  @@index([branchId])
+}
+
+model TrainerAvailability {
+  id          String @id @default(cuid())
+  trainerId   String
+  branchId    String
+  weekday     Int
+  startMinute Int
+  endMinute   Int
+
+  trainer Trainer @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  branch  Branch  @relation(fields: [branchId], references: [id])
+
+  @@index([trainerId, weekday])
+}
+
+enum ExerciseCategory {
+  STRENGTH
+  CARDIO
+  MOBILITY
+  CORE
+  PLYOMETRIC
+  RECOVERY
+}
+
+model Exercise {
+  id           String           @id @default(cuid())
+  name         Json
+  category     ExerciseCategory
+  muscleGroups String[]
+  equipment    String           @default("")
+  instructions Json
+  videoUrl     String?
+  isActive     Boolean          @default(true)
+  createdById  String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  programExercises ProgramExercise[]
+  workoutSets      WorkoutSet[]
+
+  @@index([category])
+}
+
+enum ProgramStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+model TrainingProgram {
+  id            String        @id @default(cuid())
+  trainerId     String
+  name          String
+  description   String        @default("")
+  goal          String        @default("")
+  level         Difficulty
+  durationWeeks Int
+  isTemplate    Boolean       @default(false)
+  status        ProgramStatus @default(ACTIVE)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  trainer     Trainer             @relation(fields: [trainerId], references: [id])
+  days        ProgramDay[]
+  assignments ProgramAssignment[]
+
+  @@index([trainerId, status])
+}
+
+model ProgramDay {
+  id        String  @id @default(cuid())
+  programId String
+  dayIndex  Int
+  title     String
+  weekday   Int?
+  notes     String  @default("")
+
+  program     TrainingProgram   @relation(fields: [programId], references: [id], onDelete: Cascade)
+  exercises   ProgramExercise[]
+  workoutLogs WorkoutLog[]
+
+  @@unique([programId, dayIndex])
+}
+
+model ProgramExercise {
+  id              String  @id @default(cuid())
+  programDayId    String
+  exerciseId      String
+  order           Int
+  sets            Int
+  reps            Int?
+  durationSeconds Int?
+  restSeconds     Int
+  notes           String  @default("")
+
+  day      ProgramDay @relation(fields: [programDayId], references: [id], onDelete: Cascade)
+  exercise Exercise   @relation(fields: [exerciseId], references: [id])
+
+  @@index([programDayId, order])
+}
+
+enum AssignmentStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+model ProgramAssignment {
+  id                 String           @id @default(cuid())
+  programId          String
+  memberId           String
+  trainerId          String
+  startDate          DateTime         @db.Date
+  status             AssignmentStatus @default(ACTIVE)
+  memberInstructions String           @default("")
+  /// Private to staff — never returned to the member
+  trainerNotes       String           @default("")
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  program     TrainingProgram @relation(fields: [programId], references: [id])
+  member      Member          @relation(fields: [memberId], references: [id])
+  trainer     Trainer         @relation(fields: [trainerId], references: [id])
+  workoutLogs WorkoutLog[]
+
+  @@index([memberId, status])
+  @@index([trainerId, status])
+}
+
+model WorkoutLog {
+  id              String   @id @default(cuid())
+  assignmentId    String
+  memberId        String
+  programDayId    String
+  completedAt     DateTime
+  durationMinutes Int?
+  perceivedEffort Int?
+  notes           String   @default("")
+  createdAt       DateTime @default(now())
+
+  assignment ProgramAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  member     Member            @relation(fields: [memberId], references: [id])
+  day        ProgramDay        @relation(fields: [programDayId], references: [id])
+  sets       WorkoutSet[]
+
+  @@index([memberId, completedAt])
+  @@index([assignmentId])
+}
+
+model WorkoutSet {
+  id              String  @id @default(cuid())
+  workoutLogId    String
+  exerciseId      String
+  setIndex        Int
+  reps            Int?
+  weightKg        Decimal? @db.Decimal(6, 2)
+  durationSeconds Int?
+
+  workoutLog WorkoutLog @relation(fields: [workoutLogId], references: [id], onDelete: Cascade)
+  exercise   Exercise   @relation(fields: [exerciseId], references: [id])
+
+  @@index([workoutLogId])
+  @@index([exerciseId])
+}
+
+// ───────────────────────────── CRM ─────────────────────────────
+
+enum LeadSource {
+  WEBSITE_CONTACT
+  TRIAL_REQUEST
+  WALK_IN
+  PHONE
+  REFERRAL
+  SOCIAL
+  OTHER
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  TRIAL_SCHEDULED
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum LeadActivityType {
+  NOTE
+  CALL
+  EMAIL
+  MEETING
+  TASK
+  STATUS_CHANGE
+  ASSIGNMENT
+}
+
+model Lead {
+  id                String     @id @default(cuid())
+  name              String
+  email             String?
+  phone             String?
+  source            LeadSource
+  status            LeadStatus @default(NEW)
+  branchId          String?
+  interest          String?
+  message           String?
+  preferredDate     DateTime?  @db.Date
+  assignedToId      String?
+  consentAt         DateTime?
+  lostReason        String?
+  convertedMemberId String?
+  convertedAt       DateTime?
+  isDemo            Boolean    @default(false)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  branch          Branch?        @relation(fields: [branchId], references: [id])
+  assignedTo      User?          @relation("LeadAssignee", fields: [assignedToId], references: [id])
+  convertedMember Member?        @relation(fields: [convertedMemberId], references: [id])
+  activities      LeadActivity[]
+
+  @@index([status, createdAt])
+  @@index([assignedToId, status])
+  @@index([email])
+  @@index([phone])
+}
+
+model LeadActivity {
+  id          String           @id @default(cuid())
+  leadId      String
+  type        LeadActivityType
+  body        String
+  dueAt       DateTime?
+  completedAt DateTime?
+  actorId     String?
+  createdAt   DateTime         @default(now())
+
+  lead  Lead  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  actor User? @relation(fields: [actorId], references: [id])
+
+  @@index([leadId, createdAt])
+  @@index([type, dueAt, completedAt])
+}
+
+// ───────────────────────────── Payments ─────────────────────────────
+
+enum PaymentStatus {
+  PENDING
+  REQUIRES_ACTION
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  EXPIRED
+  PARTIALLY_REFUNDED
+  REFUNDED
+}
+
+enum PaymentPurpose {
+  MEMBERSHIP_PURCHASE
+  MEMBERSHIP_RENEWAL
+}
+
+enum PaymentProvider {
+  SANDBOX
+  MANUAL
+}
+
+enum PaymentMethod {
+  ONLINE
+  CASH
+  CARD_TERMINAL
+  BANK_TRANSFER
+}
+
+enum ReconciliationStatus {
+  UNRECONCILED
+  MATCHED
+  DISCREPANCY
+}
+
+model Payment {
+  id                   String               @id @default(cuid())
+  memberId             String
+  membershipId         String?
+  purpose              PaymentPurpose
+  provider             PaymentProvider
+  method               PaymentMethod
+  status               PaymentStatus        @default(PENDING)
+  amount               Int
+  subtotal             Int
+  discount             Int                  @default(0)
+  currency             String               @default("KZT")
+  promotionId          String?
+  providerRef          String?              @unique
+  /// Prevents duplicate charges when a request is retried
+  idempotencyKey       String               @unique
+  /// true for sandbox payments and seeded demo history — never real money
+  isTest               Boolean              @default(false)
+  reconciliationStatus ReconciliationStatus @default(UNRECONCILED)
+  reconciliationNote   String?
+  reference            String?
+  failureReason        String?
+  recordedById         String?
+  /// What to apply on success, e.g. { "renewDays": 30 }
+  metadata             Json?
+  paidAt               DateTime?
+  expiresAt            DateTime?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  member      Member               @relation(fields: [memberId], references: [id])
+  membership  Membership?          @relation(fields: [membershipId], references: [id])
+  promotion   Promotion?           @relation(fields: [promotionId], references: [id])
+  refunds     Refund[]
+  invoice     Invoice?
+  redemption  PromotionRedemption?
+  events      PaymentEvent[]
+
+  @@index([memberId, createdAt])
+  @@index([status, createdAt])
+  @@index([paidAt])
+}
+
+/// Every provider callback, stored once per provider event id (idempotent webhook processing).
+model PaymentEvent {
+  id          String          @id @default(cuid())
+  provider    PaymentProvider
+  eventId     String
+  paymentId   String?
+  type        String
+  payload     Json
+  processedAt DateTime?
+  error       String?
+  createdAt   DateTime        @default(now())
+
+  payment Payment? @relation(fields: [paymentId], references: [id])
+
+  @@unique([provider, eventId])
+}
+
+enum RefundStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+model Refund {
+  id          String       @id @default(cuid())
+  paymentId   String
+  amount      Int
+  reason      String
+  status      RefundStatus @default(SUCCEEDED)
+  createdById String
+  createdAt   DateTime     @default(now())
+
+  payment Payment @relation(fields: [paymentId], references: [id])
+
+  @@index([paymentId])
+  @@index([createdAt])
+}
+
+model Invoice {
+  id        String   @id @default(cuid())
+  seq       Int      @unique @default(autoincrement())
+  number    String   @unique
+  paymentId String   @unique
+  memberId  String
+  items     Json
+  subtotal  Int
+  discount  Int
+  total     Int
+  currency  String   @default("KZT")
+  issuedAt  DateTime @default(now())
+
+  payment Payment @relation(fields: [paymentId], references: [id])
+  member  Member  @relation(fields: [memberId], references: [id])
+
+  @@index([memberId])
+}
+
+enum PromotionType {
+  PERCENT
+  FIXED
+}
+
+enum PromotionStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+model Promotion {
+  id              String          @id @default(cuid())
+  code            String?         @unique
+  name            Json
+  description     Json
+  type            PromotionType
+  value           Int
+  status          PromotionStatus @default(ACTIVE)
+  validFrom       DateTime?
+  validUntil      DateTime?
+  maxRedemptions  Int?
+  redemptionCount Int             @default(0)
+  perMemberLimit  Int?
+  newMembersOnly  Boolean         @default(false)
+  planIds         String[]
+  minAmount       Int?
+  isPublic        Boolean         @default(false)
+  imageUrl        String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  payments    Payment[]
+  redemptions PromotionRedemption[]
+
+  @@index([status, isPublic])
+}
+
+model PromotionRedemption {
+  id          String   @id @default(cuid())
+  promotionId String
+  memberId    String
+  paymentId   String   @unique
+  discount    Int
+  createdAt   DateTime @default(now())
+
+  promotion Promotion @relation(fields: [promotionId], references: [id])
+  member    Member    @relation(fields: [memberId], references: [id])
+  payment   Payment   @relation(fields: [paymentId], references: [id])
+
+  @@index([promotionId])
+  @@index([memberId])
+}
+
+// ───────────────────────────── Notifications ─────────────────────────────
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String
+  data      Json
+  /// Prevents duplicate reminders from scheduled jobs
+  dedupeKey String?   @unique
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+}
+
+enum EmailStatus {
+  QUEUED
+  SENT
+  FAILED
+  SKIPPED
+}
+
+model EmailMessage {
+  id        String      @id @default(cuid())
+  to        String
+  subject   String
+  text      String
+  type      String
+  status    EmailStatus @default(QUEUED)
+  attempts  Int         @default(0)
+  error     String?
+  sentAt    DateTime?
+  createdAt DateTime    @default(now())
+
+  @@index([status, createdAt])
+}
+
+// ───────────────────────────── Content (CMS) ─────────────────────────────
+
+model ContentEntry {
+  key         String   @id
+  data        Json
+  version     Int      @default(1)
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+}
+
+model BlogPost {
+  id          String        @id @default(cuid())
+  slug        String        @unique
+  title       Json
+  excerpt     Json
+  body        Json
+  coverImage  Json?
+  tags        String[]
+  status      ContentStatus @default(DRAFT)
+  publishedAt DateTime?
+  authorId    String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  author User? @relation(fields: [authorId], references: [id])
+
+  @@index([status, publishedAt])
+}
+
+model FaqItem {
+  id          String   @id @default(cuid())
+  question    Json
+  answer      Json
+  category    String
+  sortOrder   Int      @default(100)
+  isPublished Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model GalleryItem {
+  id          String   @id @default(cuid())
+  image       Json
+  caption     Json
+  category    String
+  branchId    String?
+  sortOrder   Int      @default(100)
+  isPublished Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  branch Branch? @relation(fields: [branchId], references: [id])
+}
+
+model Testimonial {
+  id           String   @id @default(cuid())
+  authorName   String
+  authorDetail Json
+  quote        Json
+  rating       Int
+  isPublished  Boolean  @default(true)
+  sortOrder    Int      @default(100)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Facility {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        Json
+  description Json
+  icon        String
+  image       Json?
+  branchIds   String[]
+  sortOrder   Int      @default(100)
+  isPublished Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Announcement {
+  id        String    @id @default(cuid())
+  message   Json
+  linkUrl   String?
+  startsAt  DateTime?
+  endsAt    DateTime?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model MediaAsset {
+  id           String   @id @default(cuid())
+  storageKey   String   @unique
+  url          String
+  mimeType     String
+  sizeBytes    Int
+  originalName String
+  uploadedById String?
+  createdAt    DateTime @default(now())
+
+  uploadedBy User? @relation(fields: [uploadedById], references: [id])
+}
+
+/// Image bytes for STORAGE_DRIVER=database (serverless hosting without a writable disk).
+model StoredFile {
+  key         String   @id
+  contentType String
+  sizeBytes   Int
+  bytes       Bytes
+  createdAt   DateTime @default(now())
+}
+
+// ───────────────────────────── Audit ─────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String?
+  branchId   String?
+  /// Safe metadata only — never passwords, tokens or full card data
+  metadata   Json?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  actor User? @relation("AuditActor", fields: [actorId], references: [id])
+
+  @@index([createdAt])
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+  @@index([action])
+}
+
+/// Coordinates scheduled jobs across API instances and records their last run.
+model JobRun {
+  name       String   @id
+  lastRunAt  DateTime
+  lastResult Json?
+}
