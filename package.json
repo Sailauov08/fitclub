@@ -33,7 +33,8 @@
     "test": "npm run build:shared && npm run test -w @fitclub/shared && npm run test -w @fitclub/api",
     "test:e2e": "node scripts/e2e.mjs",
     "test:e2e:install": "playwright install chromium",
-    "db:seed:reset": "npm run db:seed:reset -w @fitclub/api"
+    "db:seed:reset": "npm run db:seed:reset -w @fitclub/api",
+    "screenshots": "node scripts/screenshots.mjs && node scripts/render-banner.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",

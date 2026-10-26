@@ -1,128 +1,350 @@
-# FITCLUB
+<div align="center">
 
-A fitness club platform with three surfaces that share one API, one database and one permission model:
+<img src="docs/assets/banner.png" alt="FITCLUB — fitness club platform: public website, member portal and admin back office" width="100%" />
 
-- **Public website.** 23 pages in Kazakh, Russian and English, including memberships, the class schedule, coaches, the blog, FAQ and branch locations.
-- **Member portal.** Members manage their membership (purchase, renewal, freeze), book classes and join waitlists, use a rotating check-in QR code, follow training programs and view payments and invoices.
-- **Administration.** Staff use the reception check-in, schedule, members CRM, leads pipeline, payments and refunds, plans, promotions, CMS, analytics, staff and roles, settings and the audit log.
+<h3>A production-grade fitness club platform for Kazakhstan</h3>
 
-> This is a portfolio/demo project for a fictional club. Payments run through a **sandbox adapter**: no real payment provider is connected and no money ever moves. Seeded payments are flagged as test data and labelled as such in the UI.
+<p>
+  Public website, member portal and admin back office: three surfaces on one API, one database and one permission model.<br/>
+  Three languages (Қазақша · Русский · English), tenge pricing, Asia/Almaty time.
+</p>
 
-## Stack
+<p>
+  <a href="https://fitclub-web-azure.vercel.app"><b>🌐 Live demo</b></a> ·
+  <a href="#-screenshots"><b>📸 Screenshots</b></a> ·
+  <a href="#-architecture"><b>🧭 Architecture</b></a> ·
+  <a href="#-getting-started"><b>🚀 Getting started</b></a> ·
+  <a href="docs/architecture.md"><b>📚 Docs</b></a>
+</p>
 
-| Layer    | Choice                                                                                                                                                               |
-| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Monorepo | npm workspaces: `packages/shared`, `apps/api`, `apps/web`                                                                                                            |
-| Web      | Next.js 16 (App Router, React 19), TypeScript strict, Tailwind CSS 4, Radix-based UI kit, Motion, Lucide, next-intl, React Hook Form + Zod, TanStack Query, Recharts |
-| API      | NestJS 11, REST + OpenAPI (Swagger), Zod validation, Argon2id, `@nestjs/schedule` jobs                                                                               |
-| Data     | PostgreSQL 15+ via Prisma 7 (`@prisma/adapter-pg`)                                                                                                                   |
-| Shared   | Domain rules (membership state machine, booking policy, pricing, dates), Zod schemas, permission matrix, notification templates                                      |
-| Tests    | Vitest (shared domain), Jest + Supertest (API unit and integration against a real PostgreSQL), Playwright (end-to-end)                                               |
-| Tooling  | ESLint, Prettier, i18n key checker, GitHub Actions                                                                                                                   |
+<p>
+  <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white" />
+  <img alt="React 19" src="https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white" />
+  <img alt="NestJS 11" src="https://img.shields.io/badge/NestJS-11-E0234E?logo=nestjs&logoColor=white" />
+  <img alt="TypeScript strict" src="https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white" />
+  <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-Neon-4169E1?logo=postgresql&logoColor=white" />
+  <img alt="Prisma 7" src="https://img.shields.io/badge/Prisma-7-2D3748?logo=prisma&logoColor=white" />
+  <img alt="Tailwind CSS 4" src="https://img.shields.io/badge/Tailwind-4-06B6D4?logo=tailwindcss&logoColor=white" />
+  <img alt="Playwright" src="https://img.shields.io/badge/E2E-Playwright-2EAD33?logo=playwright&logoColor=white" />
+  <img alt="Deployed on Vercel" src="https://img.shields.io/badge/Deployed-Vercel-000000?logo=vercel&logoColor=white" />
+</p>
 
-## Quick start (Windows, macOS, Linux — no Docker required)
+<p>
+  <img alt="126 automated tests" src="https://img.shields.io/badge/tests-126%20passing-2EAD33" />
+  <img alt="3 languages" src="https://img.shields.io/badge/i18n-kk%20%C2%B7%20ru%20%C2%B7%20en-E8562A" />
+  <img alt="23 public pages" src="https://img.shields.io/badge/public%20pages-23-E8562A" />
+</p>
 
-Prerequisites: **Node.js 22+** (24 recommended) and **PostgreSQL 15+ binaries** installed locally. The helper only needs `initdb`/`pg_ctl`; it never touches an existing server.
+</div>
+
+---
+
+> [!NOTE]
+> **This is a portfolio project for a fictional club.** All data is demo data. Payments go through a clearly labelled **sandbox**, so no money moves. Try the live demo by registering your own account, buying a membership with the sandbox checkout and booking a class.
+
+## ✨ Highlights
+
+<table>
+<tr>
+<td width="33%" valign="top">
+
+### 🌐 Public website
+
+- 23 pages in **kk / ru / en**
+- Live schedule, coaches, classes
+- Memberships with plan comparison
+- Blog, FAQ, gallery, locations
+- Lead and trial forms feeding the CRM
+- SEO: sitemap, metadata, hreflang
+- Light and dark themes, responsive
+
+</td>
+<td width="33%" valign="top">
+
+### 🙋 Member portal
+
+- Buy, renew and **freeze** memberships
+- Book classes, join **waitlists**
+- Rotating **QR pass** for entry
+- Training programmes and workout log
+- Payments history and printable invoices
+- Notifications in the member's language
+
+</td>
+<td width="33%" valign="top">
+
+### 🛠️ Admin back office
+
+- **Reception** check-in by QR or search
+- Weekly calendar and recurring schedules
+- Members CRM, leads pipeline
+- Payments, refunds, reconciliation
+- Plans, promotions, CMS for the site
+- Analytics from real data, audit log
+- 6 roles with a permission matrix
+
+</td>
+</tr>
+</table>
+
+### Engineering decisions worth a look
+
+|                                 |                                                                                                                                                                                            |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 🔒 **Concurrency-safe booking** | A seat is taken with a single conditional `UPDATE … WHERE bookedCount < capacity`, backed by a `CHECK` constraint. In the integration tests, 15 members racing for 5 seats never overbook. |
+| 🔁 **Membership state machine** | `PENDING → ACTIVE ⇄ FROZEN → EXPIRED / CANCELLED`, validated in a shared package. A membership stores a snapshot of its plan, so editing a plan never rewrites what a member bought.       |
+| 💳 **Idempotent payments**      | A provider abstraction with HMAC-signed webhooks, de-duplicated by event id. Activation happens only on a verified provider event.                                                         |
+| 🎟️ **Non-forgeable QR**         | `FC1.<member>.<expiry>.<hmac>`, valid for 120 s and revocable per member. A partial unique index allows one accepted check-in per member, branch and day.                                  |
+| 🛡️ **Security by default**      | Opaque HttpOnly sessions (only hashes stored), double-submit CSRF plus an origin check, Argon2id, lockout, rate limits, branch-scoped RBAC and an audit trail.                             |
+| 🌍 **Real i18n**                | 1,690 keys in each of three languages, verified in CI. Kazakh dates and numbers are formatted deterministically because browsers ship incomplete `kk` locale data.                         |
+
+## 📸 Screenshots
+
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/home-kk.jpg" alt="Home page in Kazakh" /><p align="center"><sub><b>Home</b> · Kazakh</sub></p></td>
+<td width="50%"><img src="docs/screenshots/memberships-dark.jpg" alt="Memberships in dark mode" /><p align="center"><sub><b>Memberships</b> · dark mode</sub></p></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/schedule-ru.jpg" alt="Class schedule in Russian" /><p align="center"><sub><b>Class schedule</b> · Russian</sub></p></td>
+<td><img src="docs/screenshots/trainer-en.jpg" alt="Coach profile" /><p align="center"><sub><b>Coach profile</b></sub></p></td>
+</tr>
+</table>
+
+<details open>
+<summary><b>Admin back office</b></summary>
+<br/>
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/admin-overview.jpg" alt="Admin overview dashboard" /><p align="center"><sub><b>Overview</b>: live KPIs and revenue</sub></p></td>
+<td width="50%"><img src="docs/screenshots/admin-analytics.jpg" alt="Analytics" /><p align="center"><sub><b>Analytics</b>: every formula documented</sub></p></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/admin-schedule.jpg" alt="Weekly schedule" /><p align="center"><sub><b>Schedule</b>: capacity at a glance</sub></p></td>
+<td><img src="docs/screenshots/admin-members.jpg" alt="Members CRM" /><p align="center"><sub><b>Members</b>: filters, export, statuses</sub></p></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/admin-checkin.jpg" alt="Reception check-in" /><p align="center"><sub><b>Reception</b>: QR scanner and search</sub></p></td>
+<td><img src="docs/screenshots/admin-leads.jpg" alt="Leads pipeline" /><p align="center"><sub><b>Leads</b>: sales pipeline</sub></p></td>
+</tr>
+</table>
+</details>
+
+<details open>
+<summary><b>Member portal and mobile</b></summary>
+<br/>
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/account-overview.jpg" alt="Member dashboard" /><p align="center"><sub><b>Member dashboard</b></sub></p></td>
+<td width="50%"><img src="docs/screenshots/account-membership.jpg" alt="Membership management" /><p align="center"><sub><b>Membership</b>: freeze, renew, history</sub></p></td>
+</tr>
+</table>
+<table>
+<tr>
+<td width="33%"><img src="docs/screenshots/mobile-home.jpg" alt="Mobile home" /></td>
+<td width="33%"><img src="docs/screenshots/mobile-schedule.jpg" alt="Mobile schedule" /></td>
+<td width="33%"><img src="docs/screenshots/mobile-account.jpg" alt="Mobile member dashboard" /></td>
+</tr>
+</table>
+</details>
+
+## 🧭 Architecture
+
+```mermaid
+flowchart LR
+    subgraph Browser
+        U[Visitor / Member / Staff]
+    end
+
+    subgraph Vercel["Vercel · fra1"]
+        direction TB
+        W["fitclub-web<br/>Next.js 16 App Router<br/>ISR public pages · portal · admin"]
+        A["fitclub-api<br/>NestJS 11 · one serverless function<br/>REST + Swagger"]
+        C(["Vercel Cron<br/>daily jobs"])
+    end
+
+    subgraph Neon["Neon · eu-central-1"]
+        DB[("PostgreSQL<br/>~45 Prisma models<br/>CHECK + partial unique indexes")]
+    end
+
+    S["packages/shared<br/>domain rules · Zod schemas<br/>permissions · templates"]
+
+    U -- "HTTPS (one origin)" --> W
+    W -- "rewrite /api/* and /uploads/*<br/>first-party cookies" --> A
+    W -. "server components:<br/>ISR reads" .-> A
+    C -- "Bearer CRON_SECRET" --> A
+    A -- "Prisma + pg (pooled)" --> DB
+    S -. imported by .-> W
+    S -. imported by .-> A
+```
+
+- **One origin for the browser.** Next.js proxies `/api` and `/uploads`, so the session cookie stays first-party and CORS never comes into play.
+- **The API is the only authority.** The UI hides what you cannot do, but every rule is enforced server-side: permissions, branch scope, booking windows, capacity and membership state.
+- **A shared domain package** holds the pure functions that both apps use. The API uses them to decide, the UI uses them to explain, so the two cannot disagree.
+
+### Membership lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING: purchase
+    PENDING --> ACTIVE: provider confirms payment
+    PENDING --> CANCELLED: payment fails / expires
+    ACTIVE --> FROZEN: scheduled freeze starts
+    FROZEN --> ACTIVE: freeze ends (end date extended)
+    ACTIVE --> EXPIRED: end date reached / visits used up
+    ACTIVE --> CANCELLED: staff cancels (refund optional)
+    FROZEN --> CANCELLED
+    EXPIRED --> [*]
+    CANCELLED --> [*]
+```
+
+### Booking a class
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor M as Member
+    participant W as Web (Next.js)
+    participant A as API (NestJS)
+    participant D as PostgreSQL
+
+    M->>W: Click "Book"
+    W->>A: POST /api/me/bookings (cookie + X-CSRF-Token)
+    A->>A: Verify session, CSRF, origin
+    A->>D: BEGIN · SELECT member … FOR UPDATE
+    A->>A: Eligibility: active plan, branch, visits, window, overlaps
+    A->>D: UPDATE ClassSession SET bookedCount+1 WHERE bookedCount < capacity
+    alt seat taken
+        A->>D: INSERT Booking · COMMIT
+        A-->>W: 201 CONFIRMED
+        W-->>M: "You're booked!"
+    else class is full
+        A->>D: ROLLBACK
+        A-->>W: 409 · offer waitlist
+    end
+```
+
+### Core data model (simplified)
+
+```mermaid
+erDiagram
+    USER ||--o| MEMBER : "is a"
+    USER ||--o| STAFF_MEMBER : "is a"
+    BRANCH ||--o{ ROOM : has
+    MEMBERSHIP_PLAN ||--o{ MEMBERSHIP : "snapshotted into"
+    MEMBER ||--o{ MEMBERSHIP : holds
+    MEMBERSHIP ||--o{ MEMBERSHIP_FREEZE : "paused by"
+    MEMBERSHIP ||--o{ PAYMENT : "paid by"
+    PAYMENT ||--o{ PAYMENT_EVENT : "idempotent events"
+    CLASS_TYPE ||--o{ CLASS_SESSION : scheduled
+    ROOM ||--o{ CLASS_SESSION : hosts
+    TRAINER ||--o{ CLASS_SESSION : leads
+    CLASS_SESSION ||--o{ BOOKING : "seats"
+    CLASS_SESSION ||--o{ WAITLIST_ENTRY : queue
+    MEMBER ||--o{ BOOKING : makes
+    MEMBER ||--o{ CHECK_IN : "enters with"
+    LEAD ||--o{ LEAD_ACTIVITY : "worked through"
+```
+
+## 🧰 Tech stack
+
+| Layer       | Choice                                                                                                                                            |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Web**     | Next.js 16 (App Router, React 19), Tailwind CSS 4, Radix-based UI kit, Motion, Lucide, next-intl, React Hook Form + Zod, TanStack Query, Recharts |
+| **API**     | NestJS 11, REST + OpenAPI (Swagger), Zod validation, Argon2id, pino logs, `@nestjs/schedule` / Vercel Cron                                        |
+| **Data**    | PostgreSQL 15+ via Prisma 7 (`@prisma/adapter-pg`), Neon in production                                                                            |
+| **Shared**  | `packages/shared`: membership state machine, booking policy, pricing, Almaty dates, Zod schemas, RBAC matrix, notification templates              |
+| **Quality** | TypeScript strict, ESLint, Prettier, i18n key checker, Vitest, Jest + Supertest, Playwright, GitHub Actions                                       |
+| **Hosting** | Vercel (two projects, `fra1`) + Neon (`aws-eu-central-1`)                                                                                         |
+
+## 🧪 Testing
+
+| Suite           | Tool                                |  Tests | What it proves                                                                                                                         |
+| --------------- | ----------------------------------- | -----: | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Domain          | Vitest                              | **44** | Membership transitions, freeze maths, booking windows, late-cancel rules, pricing and promos, Almaty dates                             |
+| API integration | Jest + Supertest on real PostgreSQL | **63** | Auth, CSRF, lockout, RBAC and BOLA, overbooking races, waitlists, purchases, webhooks, refunds, QR forgery, analytics, serverless mode |
+| End-to-end      | Playwright                          | **19** | Register → buy → book → cancel; admin, reception and sales flows; permissions; language switching; every public page                   |
+
+```bash
+npm test            # domain + API tests (needs the local PostgreSQL helper)
+npm run test:e2e    # isolated fitclub_e2e database, builds and runs the full stack on :3100/:4100
+```
+
+## 🚀 Getting started
+
+**Requirements:** Node.js 22+ (24 recommended) and PostgreSQL 15+ binaries. No Docker needed: the helper creates a private cluster on port 54329 and never touches an existing server.
 
 ```bash
 npm install
-npm run db:local:init        # creates a private cluster on 127.0.0.1:54329 with fitclub + fitclub_test databases
-cp apps/api/.env.example apps/api/.env
+npm run db:local:init                              # private cluster with fitclub + fitclub_test databases
+cp apps/api/.env.example apps/api/.env             # then set QR_SIGNING_SECRET and SANDBOX_WEBHOOK_SECRET
 cp apps/web/.env.example apps/web/.env.local
+npm run db:deploy                                  # apply migrations
+npm run db:seed                                    # demo club: 3 branches, staff, 61 members, classes, payments, leads
+npm run dev                                        # web :3000 · API :4000 · Swagger :4000/api/docs
 ```
 
-Edit `apps/api/.env`: set `QR_SIGNING_SECRET` and `SANDBOX_WEBHOOK_SECRET` to random values (the file shows a one-line generator), and optionally `SEED_DEMO_PASSWORD`. Then:
+After a reboot, run `npm run db:local:start` before `npm run dev`. Locally, the seeded staff accounts (`owner@`, `admin@`, `manager@`, `reception@`, `sales@` and `trainer@fitclub.test`) and members share the `SEED_DEMO_PASSWORD` from `apps/api/.env`.
 
-```bash
-npm run db:deploy            # apply migrations
-npm run db:seed              # demo club: 3 branches, staff, 61 members, ±6 weeks of classes, payments, leads, CMS
-npm run dev                  # shared (watch) + API on :4000 + web on :3000
-```
+<details>
+<summary><b>All scripts</b></summary>
 
-Open http://localhost:3000. API docs (Swagger) are at http://localhost:4000/api/docs.
+| Command                                                       | What it does                                                            |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `npm run dev`                                                 | Shared watcher, API (watch) and web dev server                          |
+| `npm run build` / `npm start`                                 | Production build of shared → API → web, and running it                  |
+| `npm run typecheck` · `npm run lint` · `npm run format:check` | Strict TypeScript, ESLint, Prettier                                     |
+| `node scripts/check-i18n.mjs`                                 | kk/ru/en key parity plus every key used in code exists                  |
+| `npm test` · `npm run test:e2e`                               | Unit and integration tests, and the Playwright suite                    |
+| `npm run db:migrate`                                          | New migration during development                                        |
+| `npm run db:seed:reset`                                       | Re-seed, but only if the database holds nothing except demo users       |
+| `npm run provision:owner -- --email you@club.kz`              | First owner for an empty production database (one-time activation link) |
+| `npm run screenshots`                                         | Regenerate the README screenshots and banner from the local stack       |
 
-After a reboot, run `npm run db:local:start` before `npm run dev`. To use a hosted PostgreSQL instead (Neon, Supabase, RDS), skip the `db:local:*` steps and put its connection string in `DATABASE_URL`.
+</details>
 
-### Demo accounts
+## ☁️ Deployment
 
-All demo accounts share the password set in `SEED_DEMO_PASSWORD` (if empty, the seed generates one and prints it once).
+The live demo runs on **Vercel + Neon free tiers**:
 
-| Role      | E-mail                                                                             |
-| --------- | ---------------------------------------------------------------------------------- |
-| Owner     | `owner@fitclub.test`                                                               |
-| Admin     | `admin@fitclub.test`                                                               |
-| Manager   | `manager@fitclub.test`                                                             |
-| Reception | `reception@fitclub.test` (Dostyk), `reception.astana@fitclub.test` (branch-scoped) |
-| Sales     | `sales@fitclub.test`, `sales2@fitclub.test`                                        |
-| Trainer   | `trainer@fitclub.test` … `trainer8@fitclub.test`                                   |
-| Member    | `member@fitclub.test`, `member01` … `member60@fitclub.test`                        |
+- `apps/web` and `apps/api` are two Vercel projects in `fra1`. The NestJS app becomes one serverless function.
+- Uploads are stored in PostgreSQL (`STORAGE_DRIVER=database`), because serverless functions have no writable disk.
+- Background jobs run from a daily **Vercel Cron**, authenticated with `CRON_SECRET`.
+- `DEMO_MODE=true` keeps the labelled sandbox checkout available in production. Without it, production refuses to start with the sandbox enabled.
 
-`npm run db:seed:reset` re-seeds from scratch, but **only** if the database holds nothing except demo users. It refuses otherwise and always refuses when `NODE_ENV=production`.
+Step-by-step setup, environment variables and the go-live checklist for a real club are in [docs/deployment.md](docs/deployment.md).
 
-## Scripts
-
-| Command                                                                          | What it does                                                                                         |
-| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `npm run dev`                                                                    | Shared package watcher, API (watch mode) and web dev server                                          |
-| `npm run build`                                                                  | Builds shared → API → web                                                                            |
-| `npm start`                                                                      | Runs the built API and web app                                                                       |
-| `npm run typecheck` / `npm run lint`                                             | Strict TypeScript and ESLint across all workspaces                                                   |
-| `node scripts/check-i18n.mjs`                                                    | Verifies kk/ru/en key parity and that every key used in code exists                                  |
-| `npm test`                                                                       | Shared domain tests (Vitest) and API unit and integration tests (Jest) against `TEST_DATABASE_URL`   |
-| `npm run test:e2e`                                                               | Playwright end-to-end suite on an isolated `fitclub_e2e` database (see below)                        |
-| `npm run db:migrate`                                                             | Create a new migration during development (`prisma migrate dev`)                                     |
-| `npm run provision:owner -- --email you@club.kz --first Aigerim --last Saparova` | Creates the first owner account in a fresh production database and prints a one-time activation link |
-
-## Testing
-
-- **Unit (shared, Vitest).** Covers the membership state machine, freeze arithmetic, booking windows and late-cancel rules, pricing and promo math, payment transitions, and Almaty date math.
-- **API (Jest + Supertest, real PostgreSQL).** Covers:
-  - auth: sessions, CSRF, origin check, lockout, reset tokens;
-  - RBAC and branch scoping, including BOLA checks;
-  - concurrent booking: 15 members racing for 5 seats never overbook; no double booking; waitlist promotion;
-  - membership purchase, renewal, freeze and unfreeze;
-  - idempotent signed webhooks;
-  - refunds capped at the captured amount;
-  - QR forgery and replay;
-  - analytics computed from real rows.
-- **End-to-end (Playwright).** Covers:
-  - registration, login, logout and protected-route redirects;
-  - the sandbox membership purchase;
-  - booking and cancelling a class;
-  - the member dashboard and QR pass;
-  - admin creates a session and reassigns its coach;
-  - reception check-in, including the duplicate refusal;
-  - sales lead pipeline;
-  - permission restrictions;
-  - language switching;
-  - a smoke test of every public page.
-
-`npm run test:e2e` (implemented in `scripts/e2e.mjs`) drops and recreates the schema of a database whose name must end in `_e2e`, then migrates, seeds and builds the web app into `.next-e2e`. Finally it starts the API on :4100 and the web app on :3100 and runs Playwright. Locally it uses your installed Chrome (`PW_CHANNEL=chrome`); in CI it uses Playwright's Chromium (`npm run test:e2e:install`). Use `node scripts/e2e.mjs --skip-build` to reuse the last build.
-
-## Project layout
+## 📁 Project structure
 
 ```
-apps/api        NestJS API — modules per domain (auth, memberships, classes, payments, checkin, leads, content, analytics, jobs…)
-  prisma/       schema, migrations (with CHECK constraints + partial unique indexes), seed
-apps/web        Next.js app — app/[locale]/(site) public pages, /account member portal, /admin back office
-  messages/     kk.json, ru.json, en.json
-packages/shared domain rules, Zod schemas, permissions, notification templates (used by both apps)
-scripts/        local PostgreSQL helper, e2e runner, i18n checker
-tests/e2e       Playwright specs
-docs/           architecture, security, deployment, API notes
+fitclub/
+├─ apps/
+│  ├─ web/                 Next.js — app/[locale]/(site) · /account · /admin
+│  │  └─ messages/         kk.json · ru.json · en.json (1,690 keys each)
+│  └─ api/                 NestJS — modules per domain (auth, memberships, classes, payments, checkin, leads, content, analytics, jobs…)
+│     └─ prisma/           schema, migrations with CHECK constraints and partial indexes, seed
+├─ packages/shared/        domain rules, Zod schemas, permissions, notification templates
+├─ tests/e2e/              Playwright specs
+├─ scripts/                local PostgreSQL helper, e2e runner, i18n checker, screenshot tools
+└─ docs/                   architecture · security · deployment · API · screenshots
 ```
 
-## Documentation
+## 📚 Documentation
 
-- [docs/architecture.md](docs/architecture.md): system design, data model, key flows and the decisions behind them.
-- [docs/security.md](docs/security.md): authentication, authorization, CSRF, QR signing, payments, privacy, and the threat model.
-- [docs/deployment.md](docs/deployment.md): production configuration, a deployment checklist and the hosting options.
-- [docs/api.md](docs/api.md): API conventions, error format, and how to reach Swagger.
+- [Architecture](docs/architecture.md): data model, key flows and the decisions behind them
+- [Security](docs/security.md): auth, RBAC, CSRF, QR signing, payments, privacy, the dependency audit
+- [Deployment](docs/deployment.md): Vercel + Neon demo hosting and a production checklist
+- [API](docs/api.md): conventions, error format, endpoint groups (Swagger in development)
 
-## Known limitations
+## 🗺️ Limitations and roadmap
 
-- **No real payment provider.** The sandbox adapter simulates a hosted payment page and signed webhooks. A real Kazakhstan acquirer (for example Kaspi Pay, Halyk ePay or CloudPayments) has to be implemented behind the `PaymentProvider` interface before going live. Production refuses to start with the sandbox enabled unless `DEMO_MODE=true` (the public demo, where every payment is labelled as a test).
-- **E-mail is not configured.** Without `SMTP_*`, messages are stored in the outbox with status `SKIPPED` (visible under Admin → Settings → Notifications). In-app notifications work regardless.
-- **Media storage: disk or database only.** Uploads go either to `UPLOAD_DIR` (`STORAGE_DRIVER=local`) or into PostgreSQL (`STORAGE_DRIVER=database`, used on Vercel). There is no S3/CDN driver yet.
-- **Demo content.** The photos are Unsplash stock images, flagged as "Demo photo" in the UI. All club data is fictional.
-- **Hosting.** The demo targets Vercel + Neon free tiers (see [docs/deployment.md](docs/deployment.md#demo-hosting-vercel--neon)). On the Hobby plan, background jobs run once a day.
+- [ ] **Real payment provider** (Kaspi Pay / Halyk ePay / CloudPayments) behind the existing `PaymentProviderAdapter` interface. Today only the sandbox is connected.
+- [ ] **E-mail delivery.** Without SMTP, messages are kept in an outbox as `SKIPPED`; in-app notifications work.
+- [ ] **Object storage** (S3/R2 + CDN) for uploads; today they are stored on disk or in PostgreSQL.
+- [ ] **More frequent background jobs.** On the Vercel Hobby plan, cron runs daily, so class reminders are effectively off.
+
+## 👤 Author
+
+**Bekarys Sailauov** · [@Sailauov08](https://github.com/Sailauov08)
+
+<sub>Demo photos are Unsplash stock images and are labelled "Demo photo" on the site. The club, people and data are fictional.</sub>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { BellOff, CheckCheck } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useFmt } from '@/lib/format';
@@ -12,15 +12,16 @@ import { cn } from '@/lib/utils';
 
 export default function NotificationsPage() {
   const t = useTranslations('account.notifications');
+  const locale = useLocale();
   const fmt = useFmt();
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({
-    queryKey: ['notifications'],
+    queryKey: ['notifications', locale],
     queryFn: () =>
       api.get<{
         unread: number;
         items: { id: string; type: string; title: string; body: string; createdAt: string; readAt: string | null }[];
-      }>('/me/notifications'),
+      }>(`/me/notifications?locale=${locale}`),
   });
   const markAll = useMutation({
     mutationFn: () => api.post('/me/notifications/read', { ids: 'all' }),

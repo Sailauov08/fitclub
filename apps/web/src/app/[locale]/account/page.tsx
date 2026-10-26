@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { ArrowRight, CalendarDays, CheckCircle2, MailWarning, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from '@/i18n/navigation';
@@ -29,6 +29,7 @@ interface BookingRow {
 
 export default function AccountOverview() {
   const t = useTranslations('account.overview');
+  const locale = useLocale();
   const fmt = useFmt();
   const { data: me } = useMe();
   const memberships = useQuery({
@@ -47,12 +48,12 @@ export default function AccountOverview() {
       ),
   });
   const notifications = useQuery({
-    queryKey: ['notifications'],
+    queryKey: ['notifications', locale],
     queryFn: () =>
       api.get<{
         unread: number;
         items: { id: string; title: string; body: string; createdAt: string; readAt: string | null }[];
-      }>('/me/notifications'),
+      }>(`/me/notifications?locale=${locale}`),
   });
 
   const current =

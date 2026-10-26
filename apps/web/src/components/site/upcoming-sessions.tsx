@@ -23,7 +23,7 @@ export function UpcomingSessions({
   const t = useTranslations('schedule');
   const fmt = useFmt();
   const from = localDateKey(new Date());
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ['sessions', 'upcoming', classTypeId, trainerId],
     queryFn: () =>
       api.get<{ sessions: SessionItem[] }>(
@@ -35,6 +35,8 @@ export function UpcomingSessions({
     .slice(0, 8);
 
   if (isLoading) return <Skeleton className={cn('h-48', className)} />;
+  // A failed request must not read as "no classes".
+  if (isError) return <p className={cn('text-sm text-danger', className)}>{t('loadError')}</p>;
   if (sessions.length === 0) return <p className={cn('text-sm text-muted', className)}>{t('noUpcoming')}</p>;
   return (
     <ul className={cn('divide-y divide-border rounded-xl border border-border bg-surface', className)}>

@@ -1,8 +1,19 @@
-import { Body, Controller, Get, HttpCode, Patch, Post, Put, UploadedFile, UseInterceptors } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Patch,
+  Post,
+  Put,
+  Query,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
-import { localeSchema, notificationPrefsSchema, updateProfileSchema, zonedDateTime } from '@fitclub/shared';
+import { isLocale, localeSchema, notificationPrefsSchema, updateProfileSchema, zonedDateTime } from '@fitclub/shared';
 import { CurrentUser, type AuthUser } from '../../common/auth-context';
 import { badRequest } from '../../common/errors';
 import { ZBody } from '../../common/zod';
@@ -82,9 +93,10 @@ export class ProfileController {
     return { avatarUrl: stored.url };
   }
 
+  /** Rendered in the language the visitor is browsing in (`?locale=`), falling back to the profile language. */
   @Get('notifications')
-  list(@CurrentUser() user: AuthUser) {
-    return this.notifications.list(user.id, user.locale);
+  list(@CurrentUser() user: AuthUser, @Query('locale') locale?: string) {
+    return this.notifications.list(user.id, isLocale(locale) ? locale : user.locale);
   }
 
   @HttpCode(204)

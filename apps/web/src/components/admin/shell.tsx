@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import {
   BarChart3,
   Bell,
@@ -103,6 +103,7 @@ const GROUPS: { key: string; items: NavItem[] }[] = [
 export function AdminShell({ me, children }: { me: Me; children: React.ReactNode }) {
   const t = useTranslations('admin.nav');
   const roles = useTranslations('enums.role');
+  const locale = useLocale();
   const pathname = usePathname();
   const router = useRouter();
   const qc = useQueryClient();
@@ -135,12 +136,12 @@ export function AdminShell({ me, children }: { me: Me; children: React.ReactNode
   const name = `${me.profile?.firstName ?? ''} ${me.profile?.lastName ?? ''}`.trim() || me.email;
 
   const notifications = useQuery({
-    queryKey: ['notifications'],
+    queryKey: ['notifications', locale],
     queryFn: () =>
       api.get<{
         unread: number;
         items: { id: string; title: string; body: string; createdAt: string; readAt: string | null }[];
-      }>('/me/notifications'),
+      }>(`/me/notifications?locale=${locale}`),
     refetchInterval: 60_000,
   });
 
