@@ -40,7 +40,40 @@
 ---
 
 > [!NOTE]
-> **This is a portfolio project for a fictional club.** All data is demo data. Payments go through a clearly labelled **sandbox**, so no money moves. Try the live demo by registering your own account, buying a membership with the sandbox checkout and booking a class.
+> **This is a portfolio project for a fictional club.** All data is demo data. Payments go through a clearly labelled **sandbox**, so no money moves. Feel free to click around.
+
+## 🔑 Try the live demo
+
+<div align="center">
+
+### 👉 [fitclub-web-azure.vercel.app](https://fitclub-web-azure.vercel.app) 👈
+
+**Sign in:** [fitclub-web-azure.vercel.app/en/login](https://fitclub-web-azure.vercel.app/en/login) · **Password for every account:** `Fitclub-Demo-2026`
+
+</div>
+
+Each account opens a different panel. Staff land in the **admin back office**, and members land in the **member portal**.
+
+| Role                           | E-mail                          | Password            | What to try                                                                     |
+| ------------------------------ | ------------------------------- | ------------------- | ------------------------------------------------------------------------------- |
+| 👑 **Owner**                   | `owner@fitclub.test`            | `Fitclub-Demo-2026` | Everything: staff and roles, club settings, audit log, analytics with revenue   |
+| 🛡️ **Admin**                   | `admin@fitclub.test`            | `Fitclub-Demo-2026` | Full back office: members, payments and refunds, plans, promotions, website CMS |
+| 📊 **Manager**                 | `manager@fitclub.test`          | `Fitclub-Demo-2026` | Schedule, members, leads, coaches, analytics (no staff or settings)             |
+| 🧾 **Reception**               | `reception@fitclub.test`        | `Fitclub-Demo-2026` | Check-in by QR or search, selling memberships, booking members into classes     |
+| 🧾 **Reception (Astana only)** | `reception.astana@fitclub.test` | `Fitclub-Demo-2026` | The same, but **branch-scoped**: sees only FITCLUB Yesil                        |
+| 💼 **Sales**                   | `sales@fitclub.test`            | `Fitclub-Demo-2026` | Leads pipeline: activities, follow-ups, converting a lead into a member         |
+| 🏋️ **Coach**                   | `trainer@fitclub.test`          | `Fitclub-Demo-2026` | Own sessions and attendance, assigned clients, training programmes              |
+| 🙋 **Member**                  | `member@fitclub.test`           | `Fitclub-Demo-2026` | Member portal: active membership, QR pass, bookings, freeze, payments           |
+
+**Quick tour:**
+
+1. Sign in as `member@` → **Check-in QR** → copy the code.
+2. Sign in as `reception@` → **Reception** → paste the code. You get an instant check-in, and a second try is refused.
+3. Register your own account → **Memberships** → buy a plan with the **sandbox checkout** → book a class.
+4. Switch the language (🌐 KK / RU / EN) in the header. Every page, date and price is localised.
+
+> [!WARNING]
+> These are **public demo accounts**: anyone can sign in and change the demo data. The club, people and payments are fictional. Please don't enter real personal data.
 
 ## ✨ Highlights
 
