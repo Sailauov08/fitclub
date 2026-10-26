@@ -100,7 +100,24 @@ async function bootstrap() {
   app.get(Logger).log(`FITCLUB API listening on http://localhost:${env.PORT}/api (docs: /api/docs)`);
 }
 
-// Vercel's NestJS runtime imports this entry point and serves the app that bootstrap() starts.
-if (require.main === module || process.env.VERCEL) {
+/**
+ * Serverless entry point (Vercel): the default export handles each request. The Nest app is created
+ * once per function instance and reused while the instance stays warm.
+ */
+let server: Promise<(req: Request, res: Response) => void> | undefined;
+
+export default async function handler(req: Request, res: Response) {
+  server ??= createApp().then(async (app) => {
+    await app.init();
+    return app.getHttpAdapter().getInstance() as (req: Request, res: Response) => void;
+  });
+  const handle = await server.catch((error: unknown) => {
+    server = undefined; // retry the bootstrap on the next request instead of caching the failure
+    throw error;
+  });
+  handle(req, res);
+}
+
+if (require.main === module) {
   void bootstrap();
 }
